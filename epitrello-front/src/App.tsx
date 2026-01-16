@@ -1,5 +1,6 @@
 import { useState } from 'react';
-import { User, Mail, Lock, ArrowRight, CheckCircle, AlertCircle, Layout, LogOut, Plus, Trello } from 'lucide-react';
+import { User, Mail, Lock, ArrowRight, CheckCircle, AlertCircle, Layout, LogOut, Plus, Trello, ArrowLeft } from 'lucide-react';
+import KanbanBoard from "./components/KanbanBoard";
 
 interface UserData {
   id: number;
@@ -7,10 +8,13 @@ interface UserData {
   email?: string;
 }
 
+const API_BASE_URL = "http://localhost:8081";
+
 function App() {
   const [user, setUser] = useState<UserData | null>(null);
   const [isLogin, setIsLogin] = useState(true);
   const [loading, setLoading] = useState(false);
+  const [selectedBoard, setSelectedBoard] = useState<number | null>(null);
   
   const [formData, setFormData] = useState({ username: "", email: "", password: "" });
   const [status, setStatus] = useState<{ type: 'success' | 'error' | null, message: string }>({ type: null, message: "" });
@@ -21,6 +25,7 @@ function App() {
 
   const handleLogout = () => {
     setUser(null);
+    setSelectedBoard(null);
     setFormData({ username: "", email: "", password: "" });
     setStatus({ type: null, message: "" });
   };
@@ -31,8 +36,8 @@ function App() {
     setStatus({ type: null, message: "" });
 
     const url = isLogin 
-      ? "http://localhost:8081/auth/login" 
-      : "http://localhost:8081/auth/register";
+      ? `${API_BASE_URL}/auth/login` 
+      : `${API_BASE_URL}/auth/register`;
 
     const payload = isLogin 
       ? { username: formData.username, password: formData.password } 
@@ -50,13 +55,11 @@ function App() {
       if (response.ok) {
         try {
           const userData = JSON.parse(text);
-
           if (typeof userData === 'object') {
             setUser(userData);
           } else {
             setUser({ id: 0, username: formData.username });
           }
-          
         } catch {
           setUser({ id: 0, username: formData.username });
         }
@@ -64,7 +67,7 @@ function App() {
         setStatus({ type: 'error', message: text || "Identifiants incorrects" });
       }
     } catch (error) {
-      setStatus({ type: 'error', message: "Serveur inaccessible" });
+      setStatus({ type: 'error', message: "Serveur inaccessible (Vérifie que Spring Boot tourne)" });
     } finally {
       setLoading(false);
     }
@@ -73,9 +76,9 @@ function App() {
   if (user) {
     return (
       <div className="min-h-screen bg-gray-50">
-        {/* NAVBAR */}
-        <nav className="bg-white border-b border-gray-200 px-6 py-3 flex justify-between items-center sticky top-0 z-20">
-          <div className="flex items-center gap-2 text-indigo-600 font-bold text-xl">
+        {/* NAVBAR Commune */}
+        <nav className="bg-white border-b border-gray-200 px-6 py-3 flex justify-between items-center sticky top-0 z-20 shadow-sm">
+          <div className="flex items-center gap-2 text-indigo-600 font-bold text-xl cursor-pointer" onClick={() => setSelectedBoard(null)}>
             <Layout className="fill-current" />
             <span>EpiTrello</span>
           </div>
@@ -94,55 +97,69 @@ function App() {
           </div>
         </nav>
 
-        {/* CONTENU PRINCIPAL */}
-        <main className="max-w-6xl mx-auto p-6">
-          
-          <div className="flex justify-between items-end mb-6">
-            <h2 className="text-2xl font-bold text-gray-800 flex items-center gap-2">
-              <Trello size={24} className="text-gray-500" />
-              Vos Tableaux
-            </h2>
-            <button className="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg text-sm font-medium flex items-center gap-2 transition-colors shadow-sm">
-              <Plus size={16} />
-              Nouveau tableau
-            </button>
+        {selectedBoard !== null ? (
+          <div className="h-[calc(100vh-64px)]">
+             {/* Barre d'outils du tableau */}
+            <div className="bg-white border-b border-gray-200 px-6 py-2 flex items-center gap-4">
+                <button 
+                    onClick={() => setSelectedBoard(null)}
+                    className="text-gray-500 hover:text-indigo-600 transition-colors flex items-center gap-1 text-sm font-medium"
+                >
+                    <ArrowLeft size={16}/> Retour
+                </button>
+                <div className="h-6 w-px bg-gray-300"></div>
+                <h2 className="font-bold text-gray-800">Projet EpiTrello</h2>
+            </div>     
+            <KanbanBoard />
           </div>
+        ) : (
+          
+          <main className="max-w-6xl mx-auto p-6">
+            <div className="flex justify-between items-end mb-6">
+              <h2 className="text-2xl font-bold text-gray-800 flex items-center gap-2">
+                <Trello size={24} className="text-gray-500" />
+                Vos Tableaux
+              </h2>
+              <button className="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg text-sm font-medium flex items-center gap-2 transition-colors shadow-sm">
+                <Plus size={16} />
+                Nouveau tableau
+              </button>
+            </div>
 
-          {/* Grille des tableaux (Exemple statique pour l'instant) */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
-            
-            {/* Carte Tableau Exemple 1 */}
-            <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-4 hover:shadow-md transition-shadow cursor-pointer h-32 flex flex-col justify-between group">
-              <h3 className="font-semibold text-gray-800 group-hover:text-indigo-600 transition-colors">Projet EpiTrello</h3>
-              <div className="flex justify-between items-end">
-                <span className="text-xs text-gray-400">Mis à jour hier</span>
-                <div className="w-6 h-6 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center text-xs font-bold">
-                  {user.username.charAt(0).toUpperCase()}
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
+              
+              <div 
+                onClick={() => setSelectedBoard(1)}
+                className="bg-white rounded-xl shadow-sm border border-gray-200 p-4 hover:shadow-md transition-all hover:border-indigo-300 cursor-pointer h-32 flex flex-col justify-between group"
+              >
+                <h3 className="font-semibold text-gray-800 group-hover:text-indigo-600 transition-colors">Projet EpiTrello</h3>
+                <div className="flex justify-between items-end">
+                  <span className="text-xs text-gray-400">Cliquez pour ouvrir</span>
+                  <div className="w-6 h-6 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center text-xs font-bold">
+                    {user.username.charAt(0).toUpperCase()}
+                  </div>
                 </div>
               </div>
+
+               <div className="bg-gradient-to-br from-purple-500 to-indigo-600 rounded-xl shadow-sm p-4 h-32 flex flex-col justify-between text-white opacity-70 cursor-not-allowed" title="Bientôt disponible">
+                <h3 className="font-semibold">Dev Personnel</h3>
+                <span className="text-xs text-purple-100">Bientôt disponible</span>
+              </div>
+
+              <button className="border-2 border-dashed border-gray-300 rounded-xl p-4 h-32 flex flex-col items-center justify-center text-gray-400 hover:border-indigo-400 hover:text-indigo-500 hover:bg-indigo-50 transition-all">
+                <Plus size={32} />
+                <span className="text-sm font-medium mt-2">Créer un tableau</span>
+              </button>
+
             </div>
-
-             {/* Carte Tableau Exemple 2 */}
-             <div className="bg-gradient-to-br from-purple-500 to-indigo-600 rounded-xl shadow-sm p-4 hover:shadow-md transition-shadow cursor-pointer h-32 flex flex-col justify-between text-white">
-              <h3 className="font-semibold">Dev Personnel</h3>
-              <span className="text-xs text-purple-100">3 listes • 12 cartes</span>
-            </div>
-
-            {/* Carte "Créer un nouveau" */}
-            <button className="border-2 border-dashed border-gray-300 rounded-xl p-4 h-32 flex flex-col items-center justify-center text-gray-400 hover:border-indigo-400 hover:text-indigo-500 hover:bg-indigo-50 transition-all">
-              <Plus size={32} />
-              <span className="text-sm font-medium mt-2">Créer un tableau</span>
-            </button>
-
-          </div>
-        </main>
+          </main>
+        )}
       </div>
     );
   }
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-indigo-600 to-blue-500 p-4">
-      {/* Background decoration */}
       <div className="fixed top-10 left-10 w-72 h-72 bg-white opacity-10 rounded-full blur-3xl pointer-events-none"></div>
       <div className="fixed bottom-10 right-10 w-96 h-96 bg-indigo-400 opacity-20 rounded-full blur-3xl pointer-events-none"></div>
 
