@@ -3,12 +3,14 @@ package com.epitrello.controller;
 import com.epitrello.model.Board;
 import com.epitrello.repository.BoardRepository;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.web.bind.annotation.CrossOrigin; 
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
 
 @RestController
 @RequestMapping("/boards")
+@CrossOrigin(origins = "http://localhost:5173")
 public class BoardController {
 
     @Autowired

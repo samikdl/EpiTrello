@@ -170,7 +170,7 @@ public class Card {
     @JsonIgnore
     private TaskList taskList;
     
-    // Getters & Setters...
+    // Getters & Setters
 }
 ```
 
