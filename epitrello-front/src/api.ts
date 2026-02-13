@@ -53,9 +53,6 @@ export const createCard = async (listId: number, title: string) => {
   return response.json();
 };
 
-export const deleteCard = async (cardId: number) => {
-  await fetch(`${API_URL}/cards/${cardId}`, { method: "DELETE" });
-};
 
 export const moveCard = async (cardId: number, newListId: number, position?: number) => {
   const response = await fetch(`${API_URL}/cards/${cardId}/move`, {
@@ -64,5 +61,47 @@ export const moveCard = async (cardId: number, newListId: number, position?: num
     body: JSON.stringify({ newListId, position }),
   });
   if (!response.ok) throw new Error("Erreur lors du déplacement de la carte");
+  return response.json();
+};
+
+// src/api.ts
+// ... (Garde les autres fonctions)
+
+// Interface pour typer les données de mise à jour
+export interface CardUpdateData {
+  title?: string;
+  description?: string;
+  dueDate?: string; // Format ISO string pour la date
+  labels?: string[];
+}
+
+// src/api.ts (Ajoute ceci à la fin de la section LISTS)
+
+export const updateList = async (listId: number, title: string) => {
+  const response = await fetch(`${API_URL}/lists/${listId}`, {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ title }),
+  });
+  if (!response.ok) throw new Error("Impossible de modifier la liste");
+  return response.json();
+};
+
+// ... (Garde le code existant)
+
+export const deleteCard = async (cardId: number) => {
+  const response = await fetch(`${API_URL}/cards/${cardId}`, {
+    method: "DELETE",
+  });
+  if (!response.ok) throw new Error("Erreur lors de la suppression");
+};
+
+export const updateCard = async (cardId: number, data: CardUpdateData) => {
+  const response = await fetch(`${API_URL}/cards/${cardId}`, {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(data),
+  });
+  if (!response.ok) throw new Error("Erreur mise à jour carte");
   return response.json();
 };

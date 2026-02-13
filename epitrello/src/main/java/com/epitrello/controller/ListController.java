@@ -33,20 +33,20 @@ public class ListController {
         
         taskList.setBoard(board);
         if (taskList.getPosition() == null) {
-            taskList.setPosition(0); 
+            taskList.setPosition(0);
         }
         return taskListRepository.save(taskList);
     }
 
     @PutMapping("/lists/{id}")
     public TaskList updateList(@PathVariable Long id, @RequestBody TaskList listDetails) {
-        TaskList taskList = taskListRepository.findById(id)
+        TaskList list = taskListRepository.findById(id)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Liste non trouvée"));
 
-        if (listDetails.getTitle() != null) taskList.setTitle(listDetails.getTitle());
-        if (listDetails.getPosition() != null) taskList.setPosition(listDetails.getPosition());
-
-        return taskListRepository.save(taskList);
+        if (listDetails.getTitle() != null) {
+            list.setTitle(listDetails.getTitle());
+        }
+        return taskListRepository.save(list);
     }
 
     @DeleteMapping("/lists/{id}")

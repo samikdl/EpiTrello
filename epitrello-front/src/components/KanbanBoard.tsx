@@ -1,13 +1,17 @@
 import { useEffect, useState } from "react";
 import { DragDropContext, Droppable, Draggable, type DropResult } from "@hello-pangea/dnd";
-import { Plus, X, Trash2 } from "lucide-react"; 
-import { getLists, getCards, moveCard, createList, createCard, deleteCard, deleteList } from "../api";
+import { Plus, X, Trash2, Clock } from "lucide-react";
+import toast from "react-hot-toast";
+import { getLists, getCards, moveCard, createList, createCard, deleteCard, deleteList, updateList } from "../api";
+import CardModal from "./CardModal";
 
 interface Card {
   id: number;
   title: string;
   description: string;
   position: number;
+  dueDate?: string;
+  labels?: string[];
 }
 
 interface TaskList {
@@ -23,10 +27,9 @@ interface KanbanBoardProps {
 
 export default function KanbanBoard({ boardId }: KanbanBoardProps) {
   const [lists, setLists] = useState<TaskList[]>([]);
-
+  const [selectedCard, setSelectedCard] = useState<Card | null>(null);
   const [isAddingList, setIsAddingList] = useState(false);
   const [newListTitle, setNewListTitle] = useState("");
-  
   const [addingCardToListId, setAddingCardToListId] = useState<number | null>(null);
   const [newCardTitle, setNewCardTitle] = useState("");
 
@@ -43,60 +46,107 @@ export default function KanbanBoard({ boardId }: KanbanBoardProps) {
       listsWithCards.sort((a, b) => a.position - b.position);
       setLists(listsWithCards);
     } catch (error) {
-      console.error(error);
+      toast.error("Impossible de charger le tableau");
     }
   };
 
   useEffect(() => {
     if (boardId) {
-        setLists([]);
-        fetchData();
+      setLists([]);
+      fetchData();
     }
   }, [boardId]);
-
 
   const handleCreateList = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newListTitle.trim()) return;
-    await createList(boardId, newListTitle);
-    setNewListTitle("");
-    setIsAddingList(false);
-    fetchData(); 
+    try {
+      await createList(boardId, newListTitle);
+      setNewListTitle("");
+      setIsAddingList(false);
+      fetchData();
+      toast.success("Liste créée !");
+    } catch (e) {
+      toast.error("Erreur création liste");
+    }
+  };
+
+  const handleRenameList = async (list: TaskList) => {
+    const newTitle = prompt("Nouveau nom de la liste :", list.title);
+    if (newTitle && newTitle !== list.title) {
+      try {
+        const newLists = [...lists];
+        const index = newLists.findIndex((l) => l.id === list.id);
+        if (index !== -1) {
+          newLists[index].title = newTitle;
+          setLists(newLists);
+        }
+        await updateList(list.id, newTitle);
+        toast.success("Liste renommée");
+      } catch (e) {
+        toast.error("Erreur renommage");
+        fetchData();
+      }
+    }
   };
 
   const handleCreateCard = async (e: React.FormEvent, listId: number) => {
     e.preventDefault();
     if (!newCardTitle.trim()) return;
-    await createCard(listId, newCardTitle);
-    setNewCardTitle("");
-    setAddingCardToListId(null);
-    fetchData();
+    try {
+      await createCard(listId, newCardTitle);
+      setNewCardTitle("");
+      setAddingCardToListId(null);
+      fetchData();
+      toast.success("Carte ajoutée");
+    } catch (e) {
+      toast.error("Erreur création carte");
+    }
   };
 
   const handleDeleteCard = async (cardId: number) => {
-    if(!confirm("Supprimer cette carte ?")) return;
-    const newLists = lists.map(l => ({
+    if (!confirm("Supprimer cette carte ?")) return;
+    try {
+      const newLists = lists.map((l) => ({
         ...l,
-        cards: l.cards.filter(c => c.id !== cardId)
-    }));
-    setLists(newLists);
-    await deleteCard(cardId);
+        cards: l.cards.filter((c) => c.id !== cardId),
+      }));
+      setLists(newLists);
+      await deleteCard(cardId);
+      toast.success("Carte supprimée");
+    } catch (e) {
+      toast.error("Erreur suppression");
+    }
   };
-  
+
   const handleDeleteList = async (listId: number) => {
-    if(!confirm("Supprimer cette liste et ses cartes ?")) return;
-    setLists(lists.filter(l => l.id !== listId));
-    await deleteList(listId);
+    if (!confirm("Supprimer cette liste et ses cartes ?")) return;
+    try {
+      setLists(lists.filter((l) => l.id !== listId));
+      await deleteList(listId);
+      toast.success("Liste supprimée");
+    } catch (e) {
+      toast.error("Erreur suppression");
+    }
   };
 
   const onDragEnd = async (result: DropResult) => {
     const { source, destination, draggableId } = result;
+
     if (!destination) return;
-    if (source.droppableId === destination.droppableId && source.index === destination.index) return;
+    if (
+      source.droppableId === destination.droppableId &&
+      source.index === destination.index
+    )
+      return;
 
     const newLists = [...lists];
-    const sourceListIndex = newLists.findIndex(l => l.id.toString() === source.droppableId);
-    const destListIndex = newLists.findIndex(l => l.id.toString() === destination.droppableId);
+    const sourceListIndex = newLists.findIndex(
+      (l) => l.id.toString() === source.droppableId
+    );
+    const destListIndex = newLists.findIndex(
+      (l) => l.id.toString() === destination.droppableId
+    );
 
     if (sourceListIndex === -1 || destListIndex === -1) return;
 
@@ -106,7 +156,12 @@ export default function KanbanBoard({ boardId }: KanbanBoardProps) {
     destList.cards.splice(destination.index, 0, movedCard);
 
     setLists(newLists);
-    await moveCard(Number(draggableId), destList.id);
+
+    try {
+      await moveCard(Number(draggableId), destList.id);
+    } catch (error) {
+      toast.error("Erreur déplacement");
+    }
   };
 
   return (
@@ -120,29 +175,72 @@ export default function KanbanBoard({ boardId }: KanbanBoardProps) {
                 {...provided.droppableProps}
                 className="bg-gray-100 rounded-xl w-72 flex-shrink-0 flex flex-col max-h-[80vh] shadow-lg"
               >
-                <div className="p-3 font-bold text-sm text-gray-700 flex justify-between items-center">
-                    <span>{list.title}</span>
-                    <button onClick={() => handleDeleteList(list.id)} className="text-gray-400 hover:text-red-500 transition-colors">
-                        <Trash2 size={14}/>
-                    </button>
+                <div className="p-3 font-bold text-sm text-gray-700 flex justify-between items-center group/header">
+                  <span
+                    onClick={() => handleRenameList(list)}
+                    className="cursor-pointer hover:bg-gray-200 px-2 py-1 rounded w-full mr-2 truncate transition-colors"
+                    title="Cliquez pour renommer"
+                  >
+                    {list.title}
+                  </span>
+                  <button
+                    onClick={() => handleDeleteList(list.id)}
+                    className="text-gray-400 hover:text-red-500 transition-colors opacity-0 group-hover/header:opacity-100"
+                  >
+                    <Trash2 size={14} />
+                  </button>
                 </div>
 
-                <div className="px-2 pb-2 flex-1 overflow-y-auto min-h-[10px]">
+                <div className="px-2 pb-2 flex-1 overflow-y-auto min-h-[10px] custom-scrollbar">
                   {list.cards.map((card, index) => (
-                    <Draggable key={card.id} draggableId={card.id.toString()} index={index}>
+                    <Draggable
+                      key={card.id}
+                      draggableId={card.id.toString()}
+                      index={index}
+                    >
                       {(provided, snapshot) => (
                         <div
                           ref={provided.innerRef}
                           {...provided.draggableProps}
                           {...provided.dragHandleProps}
-                          className={`bg-white p-2.5 rounded-lg shadow-sm mb-2 text-sm text-gray-800 border border-gray-200 group hover:border-blue-400 ${snapshot.isDragging ? "rotate-2 shadow-lg" : ""}`}
+                          onClick={() => setSelectedCard(card)}
+                          className={`bg-white p-2.5 rounded-lg shadow-sm mb-2 text-sm text-gray-800 border border-gray-200 group hover:border-blue-400 cursor-pointer ${
+                            snapshot.isDragging ? "rotate-2 shadow-lg" : ""
+                          }`}
                         >
+                          {card.labels && card.labels.length > 0 && (
+                            <div className="flex flex-wrap gap-1 mb-2">
+                              {card.labels.map((l, i) => (
+                                <div
+                                  key={i}
+                                  className="h-2 w-8 bg-blue-400 rounded-full"
+                                  title={l}
+                                ></div>
+                              ))}
+                            </div>
+                          )}
+
                           <div className="flex justify-between items-start gap-2">
-                             <span className="break-words w-full">{card.title}</span>
-                             <button onClick={() => handleDeleteCard(card.id)} className="text-gray-300 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0">
-                                <X size={14}/>
-                             </button>
+                            <span className="break-words w-full">
+                              {card.title}
+                            </span>
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleDeleteCard(card.id);
+                              }}
+                              className="text-gray-300 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0"
+                            >
+                              <X size={14} />
+                            </button>
                           </div>
+
+                          {card.dueDate && (
+                            <div className="mt-2 flex items-center gap-1 text-xs text-gray-500">
+                              <Clock size={12} />
+                              {new Date(card.dueDate).toLocaleDateString()}
+                            </div>
+                          )}
                         </div>
                       )}
                     </Draggable>
@@ -151,56 +249,106 @@ export default function KanbanBoard({ boardId }: KanbanBoardProps) {
                 </div>
 
                 <div className="p-2 pt-0">
-                    {addingCardToListId === list.id ? (
-                        <form onSubmit={(e) => handleCreateCard(e, list.id)} className="mt-2 bg-white p-2 rounded shadow-sm">
-                            <textarea 
-                                autoFocus
-                                className="w-full text-sm outline-none resize-none mb-2"
-                                placeholder="Saisissez un titre..."
-                                rows={2}
-                                value={newCardTitle}
-                                onChange={e => setNewCardTitle(e.target.value)}
-                                onKeyDown={e => { if(e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleCreateCard(e, list.id); }}}
-                            />
-                            <div className="flex gap-2 items-center">
-                                <button type="submit" className="bg-blue-600 text-white text-xs px-3 py-1.5 rounded hover:bg-blue-700 font-medium">Ajouter</button>
-                                <button type="button" onClick={() => setAddingCardToListId(null)} className="text-gray-500 hover:text-gray-800"><X size={18}/></button>
-                            </div>
-                        </form>
-                    ) : (
-                        <button onClick={() => setAddingCardToListId(list.id)} className="w-full flex items-center gap-2 p-2 text-gray-500 hover:bg-gray-200 rounded text-sm text-left transition-colors">
-                            <Plus size={16} /> Ajouter une carte
+                  {addingCardToListId === list.id ? (
+                    <form
+                      onSubmit={(e) => handleCreateCard(e, list.id)}
+                      className="mt-2 bg-white p-2 rounded shadow-sm"
+                    >
+                      <textarea
+                        autoFocus
+                        className="w-full text-sm outline-none resize-none mb-2"
+                        placeholder="Titre de la carte..."
+                        rows={2}
+                        value={newCardTitle}
+                        onChange={(e) => setNewCardTitle(e.target.value)}
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter" && !e.shiftKey) {
+                            e.preventDefault();
+                            handleCreateCard(e, list.id);
+                          }
+                        }}
+                      />
+                      <div className="flex gap-2 items-center">
+                        <button
+                          type="submit"
+                          className="bg-blue-600 text-white text-xs px-3 py-1.5 rounded hover:bg-blue-700 font-medium"
+                        >
+                          Ajouter
                         </button>
-                    )}
+                        <button
+                          type="button"
+                          onClick={() => setAddingCardToListId(null)}
+                          className="text-gray-500 hover:text-gray-800"
+                        >
+                          <X size={18} />
+                        </button>
+                      </div>
+                    </form>
+                  ) : (
+                    <button
+                      onClick={() => setAddingCardToListId(list.id)}
+                      className="w-full flex items-center gap-2 p-2 text-gray-500 hover:bg-gray-200 rounded text-sm text-left transition-colors"
+                    >
+                      <Plus size={16} /> Ajouter une carte
+                    </button>
+                  )}
                 </div>
               </div>
             )}
           </Droppable>
         ))}
-        
+
         <div className="w-72 flex-shrink-0">
-            {isAddingList ? (
-                <form onSubmit={handleCreateList} className="bg-white p-3 rounded-xl shadow-lg border border-blue-500">
-                    <input 
-                        autoFocus
-                        type="text" 
-                        className="w-full border-2 border-blue-500 rounded p-2 text-sm mb-2 outline-none"
-                        placeholder="Nom de la liste..."
-                        value={newListTitle}
-                        onChange={(e) => setNewListTitle(e.target.value)}
-                    />
-                    <div className="flex gap-2 items-center">
-                        <button type="submit" className="bg-blue-600 text-white text-sm px-4 py-1.5 rounded hover:bg-blue-700">Ajouter</button>
-                        <button type="button" onClick={() => setIsAddingList(false)} className="text-gray-500 hover:text-gray-800"><X size={20}/></button>
-                    </div>
-                </form>
-            ) : (
-                <button onClick={() => setIsAddingList(true)} className="w-full bg-white/20 hover:bg-white/30 text-white font-medium p-3 rounded-xl flex items-center gap-2 backdrop-blur-sm transition-colors">
-                    <Plus size={20} /> Ajouter une liste
+          {isAddingList ? (
+            <form
+              onSubmit={handleCreateList}
+              className="bg-white p-3 rounded-xl shadow-lg border border-blue-500"
+            >
+              <input
+                autoFocus
+                type="text"
+                className="w-full border-2 border-blue-500 rounded p-2 text-sm mb-2 outline-none"
+                placeholder="Nom de la liste..."
+                value={newListTitle}
+                onChange={(e) => setNewListTitle(e.target.value)}
+              />
+              <div className="flex gap-2 items-center">
+                <button
+                  type="submit"
+                  className="bg-blue-600 text-white text-sm px-4 py-1.5 rounded hover:bg-blue-700"
+                >
+                  Ajouter
                 </button>
-            )}
+                <button
+                  type="button"
+                  onClick={() => setIsAddingList(false)}
+                  className="text-gray-500 hover:text-gray-800"
+                >
+                  <X size={20} />
+                </button>
+              </div>
+            </form>
+          ) : (
+            <button
+              onClick={() => setIsAddingList(true)}
+              className="w-full bg-white/20 hover:bg-white/30 text-white font-medium p-3 rounded-xl flex items-center gap-2 backdrop-blur-sm transition-colors"
+            >
+              <Plus size={20} /> Ajouter une liste
+            </button>
+          )}
         </div>
       </DragDropContext>
+
+      {selectedCard && (
+        <CardModal
+          card={selectedCard}
+          onClose={() => setSelectedCard(null)}
+          onUpdate={() => {
+            fetchData();
+            toast.success("Carte mise à jour");
+          }}
+        />
+      )}
     </div>
   );
 }

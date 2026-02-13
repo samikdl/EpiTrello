@@ -38,7 +38,6 @@ public class CardController {
         }
         return cardRepository.save(card);
     }
-
     @PutMapping("/cards/{id}")
     public Card updateCard(@PathVariable Long id, @RequestBody Card cardDetails) {
         Card card = cardRepository.findById(id)
@@ -47,6 +46,8 @@ public class CardController {
         if (cardDetails.getTitle() != null) card.setTitle(cardDetails.getTitle());
         if (cardDetails.getDescription() != null) card.setDescription(cardDetails.getDescription());
         if (cardDetails.getPosition() != null) card.setPosition(cardDetails.getPosition());
+        if (cardDetails.getDueDate() != null) card.setDueDate(cardDetails.getDueDate());
+        if (cardDetails.getLabels() != null) card.setLabels(cardDetails.getLabels());
 
         return cardRepository.save(card);
     }
@@ -54,22 +55,17 @@ public class CardController {
     @PutMapping("/cards/{id}/move")
     public Card moveCard(@PathVariable Long id, @RequestBody Map<String, Long> payload) {
         Long newListId = payload.get("newListId");
-        if (newListId == null) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "ID de la nouvelle liste requis");
-        }
+        if (newListId == null) throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "ID nouvelle liste requis");
 
         Card card = cardRepository.findById(id)
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Carte non trouvée"));
-
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Carte introuvable"));
         TaskList newTaskList = taskListRepository.findById(newListId)
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Nouvelle liste non trouvée"));
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Liste cible introuvable"));
 
         card.setTaskList(newTaskList);
-        
         if (payload.containsKey("position")) {
             card.setPosition(payload.get("position").intValue());
         }
-
         return cardRepository.save(card);
     }
 
