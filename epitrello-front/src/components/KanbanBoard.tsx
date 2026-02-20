@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { DragDropContext, Droppable, Draggable, type DropResult } from "@hello-pangea/dnd";
-import { Plus, X, Trash2, Clock } from "lucide-react";
+import { Plus, X, Trash2, Clock, MoreHorizontal } from "lucide-react";
 import toast from "react-hot-toast";
 import { getLists, getCards, moveCard, createList, createCard, deleteCard, deleteList, updateList } from "../api";
 import CardModal from "./CardModal";
@@ -116,17 +116,20 @@ export default function KanbanBoard({ boardId }: KanbanBoardProps) {
       toast.success("Carte supprimée");
     } catch (e) {
       toast.error("Erreur suppression");
+      fetchData();
     }
   };
 
   const handleDeleteList = async (listId: number) => {
     if (!confirm("Supprimer cette liste et ses cartes ?")) return;
     try {
-      setLists(lists.filter((l) => l.id !== listId));
+      const newLists = lists.filter((l) => l.id !== listId);
+      setLists(newLists);
       await deleteList(listId);
       toast.success("Liste supprimée");
     } catch (e) {
       toast.error("Erreur suppression");
+      fetchData();
     }
   };
 
@@ -165,7 +168,7 @@ export default function KanbanBoard({ boardId }: KanbanBoardProps) {
   };
 
   return (
-    <div className="flex-1 overflow-x-auto bg-blue-600 p-6 flex items-start gap-4 min-h-screen">
+    <div className="flex-1 overflow-x-auto bg-slate-800 p-8 flex items-start gap-6 min-h-full font-sans">
       <DragDropContext onDragEnd={onDragEnd}>
         {lists.map((list) => (
           <Droppable key={list.id} droppableId={list.id.toString()}>
@@ -173,25 +176,24 @@ export default function KanbanBoard({ boardId }: KanbanBoardProps) {
               <div
                 ref={provided.innerRef}
                 {...provided.droppableProps}
-                className="bg-gray-100 rounded-xl w-72 flex-shrink-0 flex flex-col max-h-[80vh] shadow-lg"
+                className="bg-[#F1F2F4] rounded-xl w-[280px] flex-shrink-0 flex flex-col max-h-[78vh] shadow-xl border border-white/10"
               >
-                <div className="p-3 font-bold text-sm text-gray-700 flex justify-between items-center group/header">
+                <div className="p-3 px-4 font-bold text-gray-700 flex justify-between items-center group/header">
                   <span
                     onClick={() => handleRenameList(list)}
-                    className="cursor-pointer hover:bg-gray-200 px-2 py-1 rounded w-full mr-2 truncate transition-colors"
-                    title="Cliquez pour renommer"
+                    className="text-sm cursor-pointer hover:bg-gray-200 px-2 py-1 rounded-md w-full truncate transition-colors"
                   >
                     {list.title}
                   </span>
                   <button
                     onClick={() => handleDeleteList(list.id)}
-                    className="text-gray-400 hover:text-red-500 transition-colors opacity-0 group-hover/header:opacity-100"
+                    className="text-gray-400 hover:text-red-500 hover:bg-red-50 p-1 rounded opacity-0 group-hover/header:opacity-100 transition-all"
                   >
-                    <Trash2 size={14} />
+                    <MoreHorizontal size={16} />
                   </button>
                 </div>
 
-                <div className="px-2 pb-2 flex-1 overflow-y-auto min-h-[10px] custom-scrollbar">
+                <div className="px-3 pb-2 flex-1 overflow-y-auto min-h-[10px] custom-scrollbar space-y-2">
                   {list.cards.map((card, index) => (
                     <Draggable
                       key={card.id}
@@ -204,16 +206,21 @@ export default function KanbanBoard({ boardId }: KanbanBoardProps) {
                           {...provided.draggableProps}
                           {...provided.dragHandleProps}
                           onClick={() => setSelectedCard(card)}
-                          className={`bg-white p-2.5 rounded-lg shadow-sm mb-2 text-sm text-gray-800 border border-gray-200 group hover:border-blue-400 cursor-pointer ${
-                            snapshot.isDragging ? "rotate-2 shadow-lg" : ""
-                          }`}
+                          className={`
+                            bg-white p-3 rounded-lg shadow-sm border border-gray-200 group hover:border-indigo-400 hover:shadow-md cursor-pointer transition-all duration-200 relative
+                            ${
+                              snapshot.isDragging
+                                ? "rotate-2 shadow-2xl scale-105 ring-2 ring-indigo-500 ring-offset-2 z-50"
+                                : ""
+                            }
+                          `}
                         >
                           {card.labels && card.labels.length > 0 && (
                             <div className="flex flex-wrap gap-1 mb-2">
                               {card.labels.map((l, i) => (
                                 <div
                                   key={i}
-                                  className="h-2 w-8 bg-blue-400 rounded-full"
+                                  className="h-1.5 w-8 bg-indigo-400 rounded-full"
                                   title={l}
                                 ></div>
                               ))}
@@ -221,7 +228,7 @@ export default function KanbanBoard({ boardId }: KanbanBoardProps) {
                           )}
 
                           <div className="flex justify-between items-start gap-2">
-                            <span className="break-words w-full">
+                            <span className="text-sm font-medium text-gray-800 leading-snug break-words w-full">
                               {card.title}
                             </span>
                             <button
@@ -229,15 +236,15 @@ export default function KanbanBoard({ boardId }: KanbanBoardProps) {
                                 e.stopPropagation();
                                 handleDeleteCard(card.id);
                               }}
-                              className="text-gray-300 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0"
+                              className="text-gray-300 hover:text-red-500 hover:bg-red-50 p-1 rounded opacity-0 group-hover:opacity-100 transition-all absolute top-2 right-2 bg-white/90"
                             >
-                              <X size={14} />
+                              <Trash2 size={13} />
                             </button>
                           </div>
 
                           {card.dueDate && (
-                            <div className="mt-2 flex items-center gap-1 text-xs text-gray-500">
-                              <Clock size={12} />
+                            <div className="mt-3 flex items-center gap-1.5 text-[10px] font-semibold text-gray-400 bg-gray-50 py-1 px-2 rounded-md w-fit">
+                              <Clock size={10} />
                               {new Date(card.dueDate).toLocaleDateString()}
                             </div>
                           )}
@@ -248,16 +255,16 @@ export default function KanbanBoard({ boardId }: KanbanBoardProps) {
                   {provided.placeholder}
                 </div>
 
-                <div className="p-2 pt-0">
+                <div className="p-3 pt-1">
                   {addingCardToListId === list.id ? (
                     <form
                       onSubmit={(e) => handleCreateCard(e, list.id)}
-                      className="mt-2 bg-white p-2 rounded shadow-sm"
+                      className="mt-1 bg-white p-2 rounded-xl shadow-md border border-indigo-200 animate-in fade-in zoom-in duration-200"
                     >
                       <textarea
                         autoFocus
-                        className="w-full text-sm outline-none resize-none mb-2"
-                        placeholder="Titre de la carte..."
+                        className="w-full text-sm outline-none resize-none mb-2 text-gray-700 placeholder:text-gray-400"
+                        placeholder="Saisissez un titre..."
                         rows={2}
                         value={newCardTitle}
                         onChange={(e) => setNewCardTitle(e.target.value)}
@@ -268,17 +275,17 @@ export default function KanbanBoard({ boardId }: KanbanBoardProps) {
                           }
                         }}
                       />
-                      <div className="flex gap-2 items-center">
+                      <div className="flex gap-2 items-center justify-between">
                         <button
                           type="submit"
-                          className="bg-blue-600 text-white text-xs px-3 py-1.5 rounded hover:bg-blue-700 font-medium"
+                          className="bg-indigo-600 text-white text-xs font-bold px-3 py-1.5 rounded-lg hover:bg-indigo-700 shadow-sm transition-colors"
                         >
                           Ajouter
                         </button>
                         <button
                           type="button"
                           onClick={() => setAddingCardToListId(null)}
-                          className="text-gray-500 hover:text-gray-800"
+                          className="text-gray-400 hover:text-gray-600"
                         >
                           <X size={18} />
                         </button>
@@ -287,7 +294,7 @@ export default function KanbanBoard({ boardId }: KanbanBoardProps) {
                   ) : (
                     <button
                       onClick={() => setAddingCardToListId(list.id)}
-                      className="w-full flex items-center gap-2 p-2 text-gray-500 hover:bg-gray-200 rounded text-sm text-left transition-colors"
+                      className="w-full flex items-center gap-2 p-2 text-gray-500 hover:bg-gray-200 hover:text-gray-800 rounded-lg text-sm font-medium transition-colors"
                     >
                       <Plus size={16} /> Ajouter une carte
                     </button>
@@ -298,16 +305,16 @@ export default function KanbanBoard({ boardId }: KanbanBoardProps) {
           </Droppable>
         ))}
 
-        <div className="w-72 flex-shrink-0">
+        <div className="w-[280px] flex-shrink-0">
           {isAddingList ? (
             <form
               onSubmit={handleCreateList}
-              className="bg-white p-3 rounded-xl shadow-lg border border-blue-500"
+              className="bg-[#F1F2F4] p-3 rounded-xl shadow-xl border border-white/20 animate-in slide-in-from-right-4 duration-300"
             >
               <input
                 autoFocus
                 type="text"
-                className="w-full border-2 border-blue-500 rounded p-2 text-sm mb-2 outline-none"
+                className="w-full border-2 border-indigo-500 rounded-lg p-2 text-sm mb-2 outline-none"
                 placeholder="Nom de la liste..."
                 value={newListTitle}
                 onChange={(e) => setNewListTitle(e.target.value)}
@@ -315,7 +322,7 @@ export default function KanbanBoard({ boardId }: KanbanBoardProps) {
               <div className="flex gap-2 items-center">
                 <button
                   type="submit"
-                  className="bg-blue-600 text-white text-sm px-4 py-1.5 rounded hover:bg-blue-700"
+                  className="bg-indigo-600 text-white text-sm font-bold px-4 py-1.5 rounded-lg hover:bg-indigo-700 shadow-lg"
                 >
                   Ajouter
                 </button>
@@ -331,9 +338,9 @@ export default function KanbanBoard({ boardId }: KanbanBoardProps) {
           ) : (
             <button
               onClick={() => setIsAddingList(true)}
-              className="w-full bg-white/20 hover:bg-white/30 text-white font-medium p-3 rounded-xl flex items-center gap-2 backdrop-blur-sm transition-colors"
+              className="w-full bg-white/10 hover:bg-white/20 text-white font-bold p-4 rounded-xl flex items-center gap-2 transition-all border border-white/10 shadow-lg"
             >
-              <Plus size={20} /> Ajouter une liste
+              <Plus size={20} /> Ajouter une autre liste
             </button>
           )}
         </div>
