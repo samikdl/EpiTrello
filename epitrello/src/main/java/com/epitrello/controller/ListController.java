@@ -46,6 +46,7 @@ public class ListController {
         if (listDetails.getTitle() != null) {
             list.setTitle(listDetails.getTitle());
         }
+        if (listDetails.getPosition() != null) list.setPosition(listDetails.getPosition());
         return taskListRepository.save(list);
     }
 

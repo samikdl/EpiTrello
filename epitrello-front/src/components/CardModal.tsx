@@ -1,20 +1,22 @@
-import { useState, useEffect } from "react";
-import { X, Clock, Tag, AlignLeft, Calendar } from "lucide-react";
+import { useState } from "react";
+import { X, Tag, AlignLeft, Calendar, Save, Clock } from "lucide-react";
 import { updateCard } from "../api";
 
-interface Card {
-  id: number;
-  title: string;
-  description: string;
-  dueDate?: string;
-  labels?: string[];
-}
+interface Card { id: number; title: string; description: string; dueDate?: string; labels?: string[]; }
+interface CardModalProps { card: Card; onClose: () => void; onUpdate: () => void; }
 
-interface CardModalProps {
-  card: Card;
-  onClose: () => void;
-  onUpdate: () => void;
-}
+const PRESET_LABELS = ['Design','Dev','Bug','Feature','Urgent','Review','Test','Docs'];
+const LABEL_STYLES: Record<string, string> = {
+  'Design':'bg-violet-100 text-violet-700 border-violet-200',
+  'Dev':'bg-blue-100 text-blue-700 border-blue-200',
+  'Bug':'bg-red-100 text-red-700 border-red-200',
+  'Feature':'bg-emerald-100 text-emerald-700 border-emerald-200',
+  'Urgent':'bg-orange-100 text-orange-700 border-orange-200',
+  'Review':'bg-amber-100 text-amber-700 border-amber-200',
+  'Test':'bg-cyan-100 text-cyan-700 border-cyan-200',
+  'Docs':'bg-fuchsia-100 text-fuchsia-700 border-fuchsia-200',
+};
+const getLabelStyle = (l: string) => LABEL_STYLES[l] || 'bg-slate-100 text-slate-600 border-slate-200';
 
 export default function CardModal({ card, onClose, onUpdate }: CardModalProps) {
   const [title, setTitle] = useState(card.title);
@@ -22,132 +24,112 @@ export default function CardModal({ card, onClose, onUpdate }: CardModalProps) {
   const [dueDate, setDueDate] = useState(card.dueDate ? card.dueDate.split('T')[0] : "");
   const [newLabel, setNewLabel] = useState("");
   const [labels, setLabels] = useState<string[]>(card.labels || []);
+  const [saving, setSaving] = useState(false);
 
   const handleSave = async () => {
+    setSaving(true);
     try {
-        const dateToSend = dueDate ? `${dueDate}T00:00:00` : undefined;
-        
-        await updateCard(card.id, { 
-            title, 
-            description, 
-            dueDate: dateToSend,
-            labels 
-        });
-        onUpdate();
-        onClose();
-    } catch (error) {
-        alert("Erreur lors de la sauvegarde");
-    }
+      await updateCard(card.id, { title, description, dueDate: dueDate ? `${dueDate}T00:00:00` : undefined, labels });
+      onUpdate(); onClose();
+    } catch { alert("Erreur lors de la sauvegarde"); }
+    finally { setSaving(false); }
   };
 
-  const addLabel = () => {
-      if (newLabel && !labels.includes(newLabel)) {
-          setLabels([...labels, newLabel]);
-          setNewLabel("");
-      }
+  const addLabel = (label?: string) => {
+    const lbl = label || newLabel;
+    if (lbl && !labels.includes(lbl)) { setLabels([...labels, lbl]); setNewLabel(""); }
   };
 
-  const removeLabel = (labelToRemove: string) => {
-      setLabels(labels.filter(l => l !== labelToRemove));
-  };
+  const removeLabel = (l: string) => setLabels(labels.filter(x => x !== l));
 
   return (
-    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-      <div className="bg-white rounded-xl shadow-2xl w-full max-w-2xl max-h-[90vh] overflow-y-auto relative">
-        
+    <div className="fixed inset-0 bg-black/30 backdrop-blur-sm flex items-center justify-center z-50 p-4"
+      onClick={(e) => e.target === e.currentTarget && onClose()}>
+      <div className="bg-white rounded-2xl shadow-2xl shadow-slate-300/50 w-full max-w-2xl max-h-[90vh] overflow-y-auto relative border border-slate-200">
+        {/* Top accent */}
+        <div className="h-1.5 bg-gradient-to-r from-indigo-500 via-purple-500 to-pink-500 rounded-t-2xl"/>
 
-        <button onClick={onClose} className="absolute top-4 right-4 text-gray-500 hover:text-gray-800">
-          <X size={24} />
+        <button onClick={onClose} className="absolute top-4 right-4 text-slate-400 hover:text-slate-700 hover:bg-slate-100 p-1.5 rounded-lg transition-all z-10">
+          <X size={18}/>
         </button>
 
-        {/* --- Header Image (Optionnel, style Trello) --- */}
-        <div className="h-32 bg-gradient-to-r from-blue-500 to-indigo-600 rounded-t-xl"></div>
+        <div className="p-6 sm:p-8">
+          {/* Title */}
+          <div className="mb-7 pr-8">
+            <input type="text" value={title} onChange={(e) => setTitle(e.target.value)}
+              className="text-xl sm:text-2xl font-black w-full border-none outline-none text-slate-800 placeholder-slate-300 bg-transparent"
+              placeholder="Titre de la carte..."/>
+            <div className="h-px bg-gradient-to-r from-indigo-400/60 to-transparent mt-2"/>
+          </div>
 
-        <div className="p-8">
-            {/* --- TITRE --- */}
-            <div className="mb-6">
-                <input 
-                    type="text" 
-                    value={title} 
-                    onChange={(e) => setTitle(e.target.value)}
-                    className="text-2xl font-bold w-full border-none focus:ring-2 focus:ring-blue-500 rounded p-1 text-gray-800 bg-transparent"
-                />
-                <p className="text-sm text-gray-500 mt-1 ml-1">Dans la liste...</p>
-            </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-                {/* Colonne Gauche (Contenu Principal) */}
-                <div className="md:col-span-2 space-y-6">
-                    
-                    {/* LABELS */}
-                    <div>
-                        <h3 className="flex items-center gap-2 font-semibold text-gray-700 mb-2">
-                            <Tag size={18} /> Étiquettes
-                        </h3>
-                        <div className="flex flex-wrap gap-2 mb-2">
-                            {labels.map(label => (
-                                <span key={label} className="bg-blue-100 text-blue-700 px-3 py-1 rounded-full text-sm font-medium flex items-center gap-1">
-                                    {label}
-                                    <button onClick={() => removeLabel(label)} className="hover:text-blue-900"><X size={12}/></button>
-                                </span>
-                            ))}
-                        </div>
-                        <div className="flex gap-2">
-                            <input 
-                                type="text" 
-                                placeholder="Nouvelle étiquette..." 
-                                className="border rounded px-2 py-1 text-sm flex-1"
-                                value={newLabel}
-                                onChange={(e) => setNewLabel(e.target.value)}
-                                onKeyDown={(e) => e.key === 'Enter' && addLabel()}
-                            />
-                            <button onClick={addLabel} className="bg-gray-100 px-3 py-1 rounded text-sm hover:bg-gray-200">Ajouter</button>
-                        </div>
-                    </div>
-
-                    {/* DESCRIPTION */}
-                    <div>
-                        <h3 className="flex items-center gap-2 font-semibold text-gray-700 mb-2">
-                            <AlignLeft size={18} /> Description
-                        </h3>
-                        <textarea 
-                            value={description}
-                            onChange={(e) => setDescription(e.target.value)}
-                            placeholder="Ajouter une description plus détaillée..."
-                            className="w-full min-h-[150px] p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none resize-none text-gray-700 bg-gray-50 focus:bg-white transition-colors"
-                        />
-                    </div>
-                </div>
-
-                {/* Colonne Droite (Métadonnées / Actions) */}
-                <div className="space-y-6">
-                    
-                    {/* DATE D'ÉCHÉANCE */}
-                    <div className="bg-gray-50 p-4 rounded-lg border border-gray-100">
-                        <h3 className="flex items-center gap-2 font-semibold text-gray-700 mb-3 text-sm">
-                            <Calendar size={16} /> Date d'échéance
-                        </h3>
-                        <input 
-                            type="date" 
-                            value={dueDate}
-                            onChange={(e) => setDueDate(e.target.value)}
-                            className="w-full border rounded p-2 text-sm text-gray-600"
-                        />
-                    </div>
-
-                    {/* ACTIONS */}
-                    <button 
-                        onClick={handleSave}
-                        className="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded shadow-lg transition-transform active:scale-95"
-                    >
-                        Sauvegarder
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-6">
+            <div className="sm:col-span-2 space-y-6">
+              {/* Labels */}
+              <div>
+                <h3 className="flex items-center gap-2 text-xs font-bold text-slate-500 uppercase tracking-wider mb-3">
+                  <Tag size={12}/> Étiquettes
+                </h3>
+                {labels.length > 0 && (
+                  <div className="flex flex-wrap gap-1.5 mb-3">
+                    {labels.map(label => (
+                      <span key={label} className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-semibold border ${getLabelStyle(label)}`}>
+                        {label}
+                        <button onClick={() => removeLabel(label)} className="hover:opacity-60 transition-opacity"><X size={10}/></button>
+                      </span>
+                    ))}
+                  </div>
+                )}
+                <div className="flex flex-wrap gap-1.5 mb-3">
+                  {PRESET_LABELS.filter(p => !labels.includes(p)).map(preset => (
+                    <button key={preset} onClick={() => addLabel(preset)}
+                      className="px-2.5 py-1 rounded-lg text-xs font-medium text-slate-500 hover:text-slate-700 bg-slate-50 hover:bg-slate-100 border border-slate-200 transition-all">
+                      + {preset}
                     </button>
-                    
-                    <p className="text-xs text-center text-gray-400">
-                        Appuyez sur Echap pour annuler
-                    </p>
+                  ))}
                 </div>
+                <div className="flex gap-2">
+                  <input type="text" placeholder="Étiquette personnalisée..." value={newLabel} onChange={(e) => setNewLabel(e.target.value)}
+                    onKeyDown={(e) => e.key==='Enter' && addLabel()}
+                    className="flex-1 bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-sm text-slate-700 placeholder-slate-400 outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100 transition-all"/>
+                  <button onClick={() => addLabel()} className="bg-slate-100 hover:bg-slate-200 text-slate-600 px-3 py-2 rounded-xl text-sm font-medium transition-colors border border-slate-200">
+                    Ajouter
+                  </button>
+                </div>
+              </div>
+
+              {/* Description */}
+              <div>
+                <h3 className="flex items-center gap-2 text-xs font-bold text-slate-500 uppercase tracking-wider mb-3">
+                  <AlignLeft size={12}/> Description
+                </h3>
+                <textarea value={description} onChange={(e) => setDescription(e.target.value)}
+                  placeholder="Ajouter une description détaillée..."
+                  className="w-full min-h-[140px] p-3.5 bg-slate-50 border border-slate-200 rounded-xl text-sm text-slate-700 placeholder-slate-400 outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100 resize-none transition-all"/>
+              </div>
             </div>
+
+            {/* Sidebar */}
+            <div className="space-y-4">
+              <div className="bg-slate-50 border border-slate-200 rounded-xl p-4">
+                <h3 className="flex items-center gap-2 text-xs font-bold text-slate-500 uppercase tracking-wider mb-3">
+                  <Calendar size={12}/> Échéance
+                </h3>
+                <input type="date" value={dueDate} onChange={(e) => setDueDate(e.target.value)}
+                  className="w-full bg-white border border-slate-200 rounded-lg p-2.5 text-sm text-slate-600 outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100 transition-all"/>
+                {dueDate && (
+                  <p className={`text-xs mt-2 font-semibold flex items-center gap-1 ${new Date(dueDate) < new Date() ? 'text-red-500' : 'text-emerald-600'}`}>
+                    <Clock size={10}/> {new Date(dueDate) < new Date() ? 'En retard' : 'À venir'}
+                  </p>
+                )}
+              </div>
+
+              <button onClick={handleSave} disabled={saving}
+                className="w-full bg-gradient-to-r from-indigo-500 to-purple-600 hover:from-indigo-600 hover:to-purple-700 text-white font-bold py-2.5 px-4 rounded-xl shadow-md shadow-indigo-200/60 transition-all active:scale-95 flex items-center justify-center gap-2 disabled:opacity-60">
+                <Save size={15}/> {saving ? 'Sauvegarde...' : 'Sauvegarder'}
+              </button>
+              <p className="text-xs text-center text-slate-400">Échap pour annuler</p>
+            </div>
+          </div>
         </div>
       </div>
     </div>
