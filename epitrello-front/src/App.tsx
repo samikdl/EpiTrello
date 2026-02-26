@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
-import { User, Mail, Lock, ArrowRight, CheckCircle, AlertCircle, LogOut, Plus, ArrowLeft, Loader, Zap, Sparkles, Trash2 } from 'lucide-react';
+import { User, Mail, Lock, ArrowRight, CheckCircle, AlertCircle, LogOut, Plus, ArrowLeft, Loader, Zap, Sparkles, Trash2, X, AlertTriangle } from 'lucide-react';
 import { Toaster } from 'react-hot-toast';
+import toast from 'react-hot-toast';
 import KanbanBoard from "./components/KanbanBoard";
 import { getBoards, createBoard } from "./api";
 
@@ -26,6 +27,9 @@ function App() {
   const [selectedBoard, setSelectedBoard] = useState<Board | null>(null);
   const [formData, setFormData] = useState({ username: "", email: "", password: "" });
   const [status, setStatus] = useState<{ type: 'success' | 'error' | null, message: string }>({ type: null, message: "" });
+  const [showCreateModal, setShowCreateModal] = useState(false);
+  const [newBoardName, setNewBoardName] = useState("");
+  const [boardToDelete, setBoardToDelete] = useState<Board | null>(null);
 
   useEffect(() => {
     const savedUser = localStorage.getItem("user");
@@ -38,22 +42,26 @@ function App() {
     try { setBoards(await getBoards()); } catch (e) { console.error(e); }
   };
 
-  const handleCreateBoard = async () => {
-    const name = prompt("Nom du nouveau tableau :");
-    if (!name) return;
+  const confirmCreateBoard = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newBoardName.trim()) return;
     try {
-      await createBoard(name);
+      await createBoard(newBoardName);
+      setNewBoardName("");
+      setShowCreateModal(false);
       loadBoards();
-    } catch { alert("Erreur création board"); }
+      toast.success("Tableau créé avec succès !");
+    } catch { toast.error("Erreur lors de la création du tableau"); }
   };
 
-  const handleDeleteBoard = async (e: React.MouseEvent, boardId: number) => {
-    e.stopPropagation();
-    if (!confirm("Supprimer ce tableau et toutes ses listes ?")) return;
+  const confirmDeleteBoard = async () => {
+    if (!boardToDelete) return;
     try {
-      await fetch(`${API_BASE_URL}/boards/${boardId}`, { method: "DELETE" });
-      setBoards(prev => prev.filter(b => b.id !== boardId));
-    } catch { alert("Erreur suppression"); }
+      await fetch(`${API_BASE_URL}/boards/${boardToDelete.id}`, { method: "DELETE" });
+      setBoards(prev => prev.filter(b => b.id !== boardToDelete.id));
+      setBoardToDelete(null);
+      toast.success("Tableau supprimé !");
+    } catch { toast.error("Erreur lors de la suppression"); }
   };
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -90,6 +98,7 @@ function App() {
 
   if (!user) return (
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-slate-100 via-indigo-50 to-violet-50 relative overflow-hidden p-4">
+      {/* ... (Code de la page de connexion inchangé) ... */}
       <div className="absolute top-0 right-0 w-[500px] h-[500px] bg-indigo-200/50 rounded-full blur-3xl -translate-y-1/2 translate-x-1/3" />
       <div className="absolute bottom-0 left-0 w-[400px] h-[400px] bg-purple-200/50 rounded-full blur-3xl translate-y-1/2 -translate-x-1/3" />
       <div className="absolute inset-0" style={{backgroundImage:'radial-gradient(circle,rgba(99,102,241,0.07) 1px,transparent 1px)',backgroundSize:'32px 32px'}} />
@@ -140,7 +149,7 @@ function App() {
   );
 
   return (
-    <div className="min-h-screen bg-slate-50">
+    <div className="min-h-screen bg-slate-50 relative">
       <Toaster position="bottom-center" toastOptions={{ style: { background:'#1e293b', color:'#f1f5f9', borderRadius:'12px', fontSize:'14px' } }}/>
 
       <nav className="bg-white border-b border-slate-200 px-4 sm:px-6 py-3 flex justify-between items-center sticky top-0 z-30 shadow-sm">
@@ -178,7 +187,7 @@ function App() {
               <h2 className="text-2xl sm:text-3xl font-black text-slate-800">Vos tableaux</h2>
               <p className="text-slate-400 text-sm mt-1">Gérez vos projets en toute simplicité</p>
             </div>
-            <button onClick={handleCreateBoard} className="flex items-center gap-2 bg-gradient-to-r from-indigo-500 to-purple-600 hover:from-indigo-600 hover:to-purple-700 text-white px-4 py-2.5 rounded-xl text-sm font-bold shadow-md shadow-indigo-200/60 transition-all hover:-translate-y-0.5 active:scale-95 self-start sm:self-auto">
+            <button onClick={() => setShowCreateModal(true)} className="flex items-center gap-2 bg-gradient-to-r from-indigo-500 to-purple-600 hover:from-indigo-600 hover:to-purple-700 text-white px-4 py-2.5 rounded-xl text-sm font-bold shadow-md shadow-indigo-200/60 transition-all hover:-translate-y-0.5 active:scale-95 self-start sm:self-auto">
               <Plus size={16}/> Nouveau tableau
             </button>
           </div>
@@ -194,7 +203,7 @@ function App() {
                     <div className="w-10 h-10 rounded-xl flex items-center justify-center font-black text-white text-sm shadow-md" style={{background:`linear-gradient(135deg, ${grad.from}, ${grad.to})`}}>
                       {board.name.charAt(0).toUpperCase()}
                     </div>
-                    <button onClick={(e) => handleDeleteBoard(e, board.id)}
+                    <button onClick={(e) => { e.stopPropagation(); setBoardToDelete(board); }}
                       className="opacity-0 group-hover:opacity-100 p-1.5 rounded-lg text-slate-400 hover:text-red-500 hover:bg-red-50 transition-all" title="Supprimer">
                       <Trash2 size={14}/>
                     </button>
@@ -204,13 +213,62 @@ function App() {
                 </div>
               );
             })}
-            <button onClick={handleCreateBoard} className="group border-2 border-dashed border-slate-200 hover:border-indigo-300 rounded-2xl p-5 flex flex-col items-center justify-center text-slate-400 hover:text-indigo-500 hover:bg-indigo-50/50 transition-all duration-200 min-h-[148px]">
+            <button onClick={() => setShowCreateModal(true)} className="group border-2 border-dashed border-slate-200 hover:border-indigo-300 rounded-2xl p-5 flex flex-col items-center justify-center text-slate-400 hover:text-indigo-500 hover:bg-indigo-50/50 transition-all duration-200 min-h-[148px]">
               <div className="w-10 h-10 rounded-xl bg-slate-100 group-hover:bg-indigo-100 flex items-center justify-center mb-2.5 transition-colors"><Plus size={20}/></div>
               <span className="text-sm font-bold">Créer un tableau</span>
             </button>
           </div>
         </main>
       )}
+
+      {/* --- MODALE : CRÉER UN TABLEAU --- */}
+      {showCreateModal && (
+        <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm flex items-center justify-center z-50 p-4 animate-in fade-in duration-200" onClick={() => setShowCreateModal(false)}>
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm overflow-hidden" onClick={e => e.stopPropagation()}>
+            <div className="h-1.5 bg-gradient-to-r from-indigo-500 to-purple-600"/>
+            <div className="p-6">
+              <div className="flex justify-between items-center mb-4">
+                <h3 className="text-lg font-black text-slate-800">Nouveau tableau</h3>
+                <button onClick={() => setShowCreateModal(false)} className="text-slate-400 hover:text-slate-700 hover:bg-slate-100 p-1.5 rounded-lg transition-colors"><X size={18}/></button>
+              </div>
+              <form onSubmit={confirmCreateBoard}>
+                <input autoFocus type="text" placeholder="Nom du projet (ex: Marketing)" value={newBoardName} onChange={(e) => setNewBoardName(e.target.value)} required
+                  className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-slate-800 placeholder-slate-400 text-sm focus:outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100 transition-all mb-4"/>
+                <button type="submit" className="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-3 rounded-xl shadow-md shadow-indigo-200 transition-all active:scale-95">
+                  Créer le tableau
+                </button>
+              </form>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* --- MODALE : SUPPRIMER UN TABLEAU --- */}
+      {boardToDelete && (
+        <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm flex items-center justify-center z-50 p-4 animate-in fade-in duration-200" onClick={() => setBoardToDelete(null)}>
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm overflow-hidden text-center" onClick={e => e.stopPropagation()}>
+            <div className="h-1.5 bg-red-500"/>
+            <div className="p-6">
+              <div className="w-14 h-14 bg-red-50 text-red-500 rounded-full flex items-center justify-center mx-auto mb-4 border-4 border-white shadow-sm">
+                <AlertTriangle size={24}/>
+              </div>
+              <h3 className="text-xl font-black text-slate-800 mb-2">Supprimer le tableau ?</h3>
+              <p className="text-sm text-slate-500 mb-6">
+                Le tableau <b className="text-slate-700">"{boardToDelete.name}"</b> et <b>toutes ses listes et cartes</b> seront effacés à tout jamais. Cette action est irréversible.
+              </p>
+              <div className="flex gap-3">
+                <button onClick={() => setBoardToDelete(null)} className="flex-1 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold py-3 rounded-xl transition-colors">
+                  Annuler
+                </button>
+                <button onClick={confirmDeleteBoard} className="flex-1 bg-red-500 hover:bg-red-600 text-white font-bold py-3 rounded-xl shadow-md shadow-red-200 transition-all active:scale-95">
+                  Supprimer
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
     </div>
   );
 }
